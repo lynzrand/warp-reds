@@ -32,18 +32,29 @@ async fn main() {
 
     let counter = Arc::new(AtomicU64::new(v));
 
+    let favicon = warp::path("favicon.ico").map(|| {
+        warp::http::Response::builder()
+            .status(404)
+            .body("")
+            .unwrap()
+    });
     let server = warp::any().and(warp::header("user-agent")).map({
         let counter = counter.clone();
         move |agent: String| {
             let c = counter.fetch_add(1, atomic::Ordering::Relaxed);
             let minimum_2_pow = c.next_power_of_two();
-            if agent.contains("KHTML") {
-                format!(
-                    "<html><body>打红人计数器 ({}/{})</body></html>",
-                    c, minimum_2_pow
-                )
+            if agent.contains("Mozilla") {
+                warp::http::Response::builder()
+                    .header("content-type", "text/html; charset=utf-8")
+                    .body(format!(
+                        "<html><body>打红人计数器 ({}/{})</body></html>",
+                        c, minimum_2_pow
+                    ))
+                    .unwrap()
             } else {
-                format!("打红人计数器 ({}/{})", c, minimum_2_pow)
+                warp::http::Response::builder()
+                    .body(format!("打红人计数器 ({}/{})", c, minimum_2_pow))
+                    .unwrap()
             }
         }
     });
@@ -64,5 +75,7 @@ async fn main() {
         }
     });
 
-    warp::serve(server).bind(([0, 0, 0, 0], port)).await;
+    warp::serve(favicon.or(server))
+        .bind(([0, 0, 0, 0], port))
+        .await;
 }
